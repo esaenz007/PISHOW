@@ -3,8 +3,8 @@
 {% block content %}
   <h1>PISHOW Control Panel</h1>
   <p>
-    Upload images or videos. Supported images: {{ current_app.config['ALLOWED_IMAGE_EXTENSIONS']|join(', ') }}.
-    Supported videos: {{ current_app.config['ALLOWED_VIDEO_EXTENSIONS']|join(', ') }}.
+    Upload images or videos. Supported images: {{ image_extensions|join(', ') }}.
+    Supported videos: {{ video_extensions|join(', ') }}.
     Max file size: {{ max_upload_mb }} MB.
   </p>
 

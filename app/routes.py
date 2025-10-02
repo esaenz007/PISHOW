@@ -27,6 +27,8 @@ def index() -> str:
         media_items=media_items,
         playlist=playlist,
         max_upload_mb=current_app.config["MAX_CONTENT_LENGTH"] // (1024 * 1024),
+        image_extensions=sorted(current_app.config["ALLOWED_IMAGE_EXTENSIONS"]),
+        video_extensions=sorted(current_app.config["ALLOWED_VIDEO_EXTENSIONS"]),
     )
 
 
