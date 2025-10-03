@@ -63,7 +63,7 @@ class PlaybackController:
             *self._extra_args,
         ]
         if self._audio_device:
-            command.extend(["--audio-device", self._audio_device])
+            command.append(f"--audio-device={self._audio_device}")
         if media_type == "video":
             command.extend(["--loop=inf", str(media_path)])
         else:
