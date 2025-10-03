@@ -12,6 +12,7 @@ class PlaybackController:
         self._current: Optional[dict] = None
         extra_args = os.environ.get("MPV_EXTRA_ARGS", "")
         self._extra_args = [arg for arg in extra_args.split() if arg]
+        self._audio_device = os.environ.get("MPV_AUDIO_DEVICE")
 
     def play(self, media_path: Path, media_type: str, media_id: str) -> None:
         media_path = media_path.resolve()
@@ -61,6 +62,8 @@ class PlaybackController:
             "--no-terminal",
             *self._extra_args,
         ]
+        if self._audio_device:
+            command.extend(["--audio-device", self._audio_device])
         if media_type == "video":
             command.extend(["--loop=inf", str(media_path)])
         else:

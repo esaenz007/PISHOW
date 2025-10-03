@@ -52,11 +52,14 @@ Environment variables:
 - `PORT` (default `8000`): override the port.
 - `MEDIA_ROOT` (default `<project>/media`): custom path for uploaded media.
 - `MPV_EXTRA_ARGS`: additional whitespace-delimited flags passed to `mpv` for every playback.
+- `MPV_AUDIO_DEVICE`: optional mpv audio device string (e.g. `alsa/hdmi:CARD=vc4hdmi0,DEV=0`).
 - `AUTO_START_LAST`: set to `1`, `true`, or `yes` to automatically resume the last-played item when the server starts.
 
 ## Projector playback notes
 
 The server spawns `mpv` in fullscreen mode to handle both images and videos. Videos loop indefinitely (`--loop=inf`). Images rely on `--loop-file=inf` and `--image-display-duration=inf` to remain on screen without flashing between transitions. If you need DRM/KMS output without X, export `MPV_EXTRA_ARGS="--gpu-context=drm --vo=gpu"` before launching the service.
+
+For HDMI audio, run `mpv --audio-device=help` once to list available sinks, then set `MPV_AUDIO_DEVICE` to the desired entry (for example `alsa/hdmi:CARD=vc4hdmi0,DEV=0`).
 
 ## Auto-start on boot
 
@@ -75,6 +78,7 @@ The server spawns `mpv` in fullscreen mode to handle both images and videos. Vid
    WorkingDirectory=/home/pi/PISHOW
    Environment="AUTO_START_LAST=1"
    Environment="MPV_EXTRA_ARGS=--gpu-context=drm --vo=gpu"
+   Environment="MPV_AUDIO_DEVICE=alsa/hdmi:CARD=vc4hdmi0,DEV=0"
    ExecStart=/usr/bin/python3 -m backend.app
    Restart=always
    RestartSec=2
