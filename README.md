@@ -100,6 +100,7 @@ When the Raspberry Pi reboots, the service will restart the Flask server, which 
 
 - `GET /api/media` – List gallery entries.
 - `POST /api/media` – Upload a file using `multipart/form-data` with field `file`.
+- `POST /api/media/upload-and-play` – Upload a file (multipart or JSON base64) and immediately start playback.
 - `DELETE /api/media/<id>` – Remove media and the underlying file.
 - `POST /api/media/<id>/play` – Send media to the projector.
 - `POST /api/stop` – Stop playback.
@@ -122,3 +123,4 @@ When the Raspberry Pi reboots, the service will restart the Flask server, which 
 - Back up `media/gallery.json` to preserve the gallery metadata if you migrate to another Pi.
 - To clear the gallery, stop the service, delete the contents of `media/`, and remove `gallery.json`.
 - For troubleshooting, run the server in a shell to see Flask logs and `mpv` start/stop events.
+- To call `POST /api/media/upload-and-play` with JSON, send `{"filename": "example.jpg", "content": "<base64>"}` (optionally `content_type`). The server stores the asset in the gallery, starts playback via `mpv`, and returns the new media record with `status: "playing"`.

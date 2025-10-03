@@ -1,9 +1,13 @@
+import base64
+import binascii
+import io
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Tuple
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
 from flask_cors import CORS
+from werkzeug.datastructures import FileStorage
 
 try:  # When executed via `python -m backend.app`
     from .media_manager import MediaManager, UnsupportedMediaType
@@ -34,6 +38,29 @@ def make_error(message: str, status: int = 400):
     return response
 
 
+def _file_from_json_payload(payload: Dict[str, Any]) -> Tuple[Optional[FileStorage], Optional[str]]:
+    if not isinstance(payload, dict):
+        return None, "JSON body must be an object"
+
+    content = payload.get("content")
+    if not isinstance(content, str) or not content:
+        return None, "Missing base64-encoded 'content' field"
+
+    filename = payload.get("filename") or payload.get("name")
+    if not isinstance(filename, str) or not filename:
+        return None, "Missing 'filename' field"
+
+    try:
+        decoded = base64.b64decode(content, validate=True)
+    except (ValueError, binascii.Error):
+        return None, "Invalid base64 data in 'content'"
+
+    stream = io.BytesIO(decoded)
+    file_storage = FileStorage(stream=stream, filename=filename, content_type=payload.get("content_type"))
+    stream.seek(0)
+    return file_storage, None
+
+
 @app.route("/api/media", methods=["GET"])
 def list_media():
     return jsonify({"items": media_manager.list_media()})
@@ -51,6 +78,63 @@ def upload_media():
     except UnsupportedMediaType as exc:
         return make_error(str(exc), 415)
     return jsonify(item), 201
+
+
+@app.route("/api/media/upload-and-play", methods=["POST"])
+def upload_and_play():
+    json_payload = request.get_json(silent=True)
+    file: Optional[FileStorage]
+    cleanup_stream = False
+
+    if request.is_json and json_payload is None:
+        return make_error("Invalid JSON payload", 400)
+
+    if json_payload:
+        built_file, error = _file_from_json_payload(json_payload)
+        if error:
+            return make_error(error, 400)
+        file = built_file
+        cleanup_stream = True
+    else:
+        if "file" not in request.files:
+            return make_error("Missing file upload", 400)
+        file = request.files["file"]
+
+    if file is None or not file.filename:
+        if cleanup_stream and file is not None and hasattr(file.stream, "close"):
+            file.stream.close()
+        return make_error("Uploaded file has no filename", 400)
+
+    item: Optional[Dict[str, Any]] = None
+    error_response = None
+    try:
+        item = media_manager.add_media(file)
+    except UnsupportedMediaType as exc:
+        error_response = make_error(str(exc), 415)
+    finally:
+        if cleanup_stream and hasattr(file.stream, "close"):
+            file.stream.close()
+
+    if error_response:
+        return error_response
+
+    if item is None:
+        return make_error("Failed to persist uploaded media", 500)
+
+    media_path = MEDIA_ROOT / item["filename"]
+    if not media_path.exists():
+        return make_error("Media file missing on disk", 410)
+
+    try:
+        playback.play(media_path, item["media_type"], item["id"])
+    except FileNotFoundError:
+        return make_error("mpv executable not found. Install mpv to enable playback.", 500)
+    except Exception as exc:  # pragma: no cover - defensive logging
+        return make_error(f"Failed to start playback: {exc}", 500)
+
+    media_manager.record_last_played(item["id"])
+
+    return jsonify({"status": "playing", "media": item}), 201
 
 
 @app.route("/api/media/<media_id>", methods=["DELETE"])
