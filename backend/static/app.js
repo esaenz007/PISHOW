@@ -6,11 +6,21 @@ const statusChip = document.querySelector('#status-chip');
 const statusDetails = document.querySelector('#status-details');
 const stopButton = document.querySelector('#stop-button');
 const refreshButton = document.querySelector('#refresh-button');
+const scheduleForm = document.querySelector('#schedule-form');
+const scheduleOnEnabled = document.querySelector('#schedule-on-enabled');
+const scheduleOnTime = document.querySelector('#schedule-on-time');
+const scheduleOffEnabled = document.querySelector('#schedule-off-enabled');
+const scheduleOffTime = document.querySelector('#schedule-off-time');
+const scheduleStatus = document.querySelector('#schedule-status');
+const projectorOnButton = document.querySelector('#projector-power-on');
+const projectorOffButton = document.querySelector('#projector-power-off');
 
 const API = {
   media: '/api/media',
   status: '/api/status',
   stop: '/api/stop',
+  projectorSchedule: '/api/projector/schedule',
+  projectorPower: '/api/projector/power',
 };
 
 async function fetchJson(url, options = {}) {
@@ -40,6 +50,19 @@ async function refreshStatus() {
     renderStatus(data);
   } catch (error) {
     console.error('Failed to load status', error);
+  }
+}
+
+async function refreshSchedule() {
+  if (!scheduleForm) {
+    return;
+  }
+  try {
+    const data = await fetchJson(API.projectorSchedule);
+    applyScheduleToForm(data);
+  } catch (error) {
+    console.error('Failed to load projector schedule', error);
+    setScheduleStatus('Failed to load schedule', true);
   }
 }
 
@@ -160,6 +183,97 @@ async function stopPlayback() {
   }
 }
 
+function applyScheduleToForm(schedule) {
+  const powerOn = schedule?.power_on || {};
+  const powerOff = schedule?.power_off || {};
+  if (scheduleOnEnabled) {
+    scheduleOnEnabled.checked = Boolean(powerOn.enabled);
+  }
+  if (scheduleOnTime) {
+    scheduleOnTime.value = powerOn.time || '';
+  }
+  if (scheduleOffEnabled) {
+    scheduleOffEnabled.checked = Boolean(powerOff.enabled);
+  }
+  if (scheduleOffTime) {
+    scheduleOffTime.value = powerOff.time || '';
+  }
+  setScheduleStatus('');
+}
+
+let scheduleStatusTimeout;
+
+function setScheduleStatus(message, isError = false) {
+  if (!scheduleStatus) {
+    return;
+  }
+  scheduleStatus.textContent = message;
+  scheduleStatus.classList.toggle('error', Boolean(isError));
+  if (scheduleStatusTimeout) {
+    clearTimeout(scheduleStatusTimeout);
+    scheduleStatusTimeout = null;
+  }
+  if (message) {
+    scheduleStatusTimeout = setTimeout(() => {
+      scheduleStatus.textContent = '';
+      scheduleStatus.classList.remove('error');
+      scheduleStatusTimeout = null;
+    }, 5000);
+  }
+}
+
+async function submitSchedule(event) {
+  event.preventDefault();
+  if (!scheduleForm) {
+    return;
+  }
+  const payload = {
+    power_on: {
+      enabled: scheduleOnEnabled?.checked ?? false,
+      time: scheduleOnTime?.value || null,
+    },
+    power_off: {
+      enabled: scheduleOffEnabled?.checked ?? false,
+      time: scheduleOffTime?.value || null,
+    },
+  };
+
+  setScheduleStatus('Saving…');
+  try {
+    await fetchJson(API.projectorSchedule, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    setScheduleStatus('Schedule saved');
+  } catch (error) {
+    console.error('Failed to save projector schedule', error);
+    setScheduleStatus(error.message || 'Failed to save schedule', true);
+    alert(`Failed to save schedule: ${error.message}`);
+  }
+}
+
+async function sendProjectorPower(state) {
+  if (!state) {
+    return;
+  }
+  setScheduleStatus(state === 'on' ? 'Turning projector on…' : 'Turning projector off…');
+  try {
+    await fetchJson(API.projectorPower, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state }),
+    });
+    setScheduleStatus(
+      state === 'on' ? 'Projector power on command sent' : 'Projector power off command sent'
+    );
+  } catch (error) {
+    console.error('Failed to send projector power command', error);
+    setScheduleStatus(`Failed to turn ${state} projector`, true);
+    alert(`Failed to trigger projector power: ${error.message}`);
+  }
+}
+
 function setupUpload() {
   uploadButton.addEventListener('click', (event) => {
     event.preventDefault();
@@ -197,10 +311,21 @@ function setupControls() {
   });
 }
 
+function setupScheduleControls() {
+  if (!scheduleForm) {
+    return;
+  }
+  scheduleForm.addEventListener('submit', submitSchedule);
+  projectorOnButton?.addEventListener('click', () => sendProjectorPower('on'));
+  projectorOffButton?.addEventListener('click', () => sendProjectorPower('off'));
+}
+
 setupUpload();
 setupControls();
+setupScheduleControls();
 refreshMedia();
 refreshStatus();
 setInterval(() => {
   refreshStatus();
 }, 5000);
+refreshSchedule();

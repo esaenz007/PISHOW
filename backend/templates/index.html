@@ -35,6 +35,35 @@
         </div>
       </section>
 
+      <section id="projector-controls">
+        <h2>Projector power schedule</h2>
+        <p>Configure automatic HDMI-CEC power control for the projector.</p>
+        <form id="schedule-form">
+          <div class="form-row schedule-row">
+            <label class="schedule-label" for="schedule-on-enabled">
+              <input type="checkbox" id="schedule-on-enabled">
+              <span>Power on at</span>
+            </label>
+            <input type="time" id="schedule-on-time" autocomplete="off">
+          </div>
+          <div class="form-row schedule-row">
+            <label class="schedule-label" for="schedule-off-enabled">
+              <input type="checkbox" id="schedule-off-enabled">
+              <span>Power off at</span>
+            </label>
+            <input type="time" id="schedule-off-time" autocomplete="off">
+          </div>
+          <div class="form-row schedule-actions">
+            <button type="submit" id="schedule-save-button">Save schedule</button>
+            <span id="schedule-status" class="form-help" role="status" aria-live="polite"></span>
+          </div>
+        </form>
+        <div class="media-actions projector-actions">
+          <button type="button" id="projector-power-on">Turn on now</button>
+          <button type="button" class="secondary" id="projector-power-off">Turn off now</button>
+        </div>
+      </section>
+
       <section>
         <h2>Gallery</h2>
         <div id="media-list"></div>

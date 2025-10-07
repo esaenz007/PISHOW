@@ -9,6 +9,7 @@ Simple Flask-based controller for projecting images and looping videos on a Rasp
 - One-click playback control that launches media in `mpv` fullscreen on the Pi's projector output.
 - Video playback loops seamlessly until you stop it or pick a different item.
 - Image playback stays on-screen indefinitely with no fade-out between switches.
+- Automated projector power schedule that sends HDMI-CEC on/off commands at configured times.
 - Remembers the last item that played and can automatically resume it on boot.
 
 ## Requirements
@@ -61,6 +62,18 @@ The server spawns `mpv` in fullscreen mode to handle both images and videos. Vid
 
 For HDMI audio, run `mpv --audio-device=help` once to list available sinks, then set `MPV_AUDIO_DEVICE` to the desired entry (for example `alsa/hdmi:CARD=vc4hdmi0,DEV=0`).
 
+## Projector power scheduling
+
+The UI now includes a "Projector power schedule" card where you can enable automatic HDMI-CEC power on and off times. When either action is enabled, the backend stores the schedule in `media/projector_schedule.json` and runs a lightweight background scheduler that sends the corresponding CEC command each day.
+
+The controller uses [`cec-ctl`](https://github.com/cec-o-matic/cec-o-matic/wiki/Cec-ctl) by default. You can customise the CEC invocation with environment variables:
+
+- `PROJECTOR_CEC_TOOL` (default `cec-ctl`) – executable used to send CEC commands.
+- `PROJECTOR_CEC_DEVICE` (optional) – path to the CEC device (for example `/dev/cec0`).
+- `PROJECTOR_CEC_LOGICAL_ADDR` (default `0`) – logical address of the projector/TV to target.
+
+If you need to trigger the projector manually, use the "Turn on now" / "Turn off now" buttons in the UI or call the `/api/projector/power` endpoint described below.
+
 ## Auto-start on boot
 
 1. Enable remembering the last played item by exporting `AUTO_START_LAST=1` in the service environment.
@@ -105,6 +118,9 @@ When the Raspberry Pi reboots, the service will restart the Flask server, which 
 - `POST /api/media/<id>/play` – Send media to the projector.
 - `POST /api/stop` – Stop playback.
 - `GET /api/status` – Retrieve current playback status.
+- `POST /api/projector/power` – Send JSON `{"state": "on"}` or `{"state": "off"}` to control the projector via CEC.
+- `GET /api/projector/schedule` – Retrieve the current projector power schedule.
+- `PUT /api/projector/schedule` – Update the schedule by sending `{ "power_on": {"enabled": bool, "time": "HH:MM"|null}, "power_off": {...} }`.
 - `GET /media/<filename>` – Serve uploaded files (used by the web UI for previews).
 
 ## File layout

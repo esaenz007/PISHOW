@@ -1,3 +1,4 @@
+import atexit
 import base64
 import binascii
 import io
@@ -12,9 +13,21 @@ from werkzeug.datastructures import FileStorage
 try:  # When executed via `python -m backend.app`
     from .media_manager import MediaManager, UnsupportedMediaType
     from .playback import PlaybackController
+    from .projector import (
+        CECController,
+        ProjectorScheduleStore,
+        ProjectorScheduler,
+        ScheduleValidationError,
+    )
 except ImportError:  # Fallback for direct execution
     from media_manager import MediaManager, UnsupportedMediaType  # type: ignore
     from playback import PlaybackController  # type: ignore
+    from projector import (  # type: ignore
+        CECController,
+        ProjectorScheduleStore,
+        ProjectorScheduler,
+        ScheduleValidationError,
+    )
 
 BASE_DIR = Path(__file__).resolve().parent
 MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", BASE_DIR.parent / "media")).resolve()
@@ -30,6 +43,10 @@ CORS(app)
 
 media_manager = MediaManager(MEDIA_ROOT)
 playback = PlaybackController()
+schedule_store = ProjectorScheduleStore(MEDIA_ROOT)
+cec_controller = CECController()
+projector_scheduler = ProjectorScheduler(cec_controller, schedule_store)
+atexit.register(projector_scheduler.shutdown)
 
 
 def make_error(message: str, status: int = 400):
@@ -164,6 +181,42 @@ def play_media(media_id: str):
     media_manager.record_last_played(media_id)
 
     return jsonify({"status": "playing", "media": item})
+
+
+@app.route("/api/projector/power", methods=["POST"])
+def projector_power():
+    payload = request.get_json(silent=True) or {}
+    state = payload.get("state")
+    if state not in {"on", "off"}:
+        return make_error("Invalid 'state'. Expected 'on' or 'off'.", 400)
+
+    if state == "on":
+        success = cec_controller.power_on()
+    else:
+        success = cec_controller.power_off()
+
+    if not success:
+        return make_error("Failed to control the projector via CEC.", 500)
+
+    return jsonify({"status": "ok", "state": state})
+
+
+@app.route("/api/projector/schedule", methods=["GET"])
+def get_projector_schedule():
+    return jsonify(schedule_store.read())
+
+
+@app.route("/api/projector/schedule", methods=["PUT"])
+def update_projector_schedule():
+    payload = request.get_json(silent=True)
+    if payload is None:
+        return make_error("Request body must be valid JSON.", 400)
+    try:
+        schedule = schedule_store.update(payload)
+    except ScheduleValidationError as exc:
+        return make_error(str(exc), 400)
+    projector_scheduler.notify_update()
+    return jsonify(schedule)
 
 
 @app.route("/api/stop", methods=["POST"])
