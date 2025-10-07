@@ -71,6 +71,7 @@ The controller uses [`cec-ctl`](https://github.com/cec-o-matic/cec-o-matic/wiki/
 - `PROJECTOR_CEC_TOOL` (default `cec-ctl`) – executable used to send CEC commands.
 - `PROJECTOR_CEC_DEVICE` (optional) – path to the CEC device (for example `/dev/cec0`).
 - `PROJECTOR_CEC_LOGICAL_ADDR` (default `0`) – logical address of the projector/TV to target.
+- `PROJECTOR_CEC_POWER_ON_ARGS` / `PROJECTOR_CEC_POWER_OFF_ARGS` – override the specific arguments passed for power on/off. Each value is tokenised with shell-style rules (e.g. `--wake` or `-s --osd-string "Pi Show"`). When unset, the defaults send `--wake` / `--standby` with `cec-ctl`.
 
 If you need to trigger the projector manually, use the "Turn on now" / "Turn off now" buttons in the UI or call the `/api/projector/power` endpoint described below.
 

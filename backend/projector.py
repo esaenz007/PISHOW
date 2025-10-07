@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import shlex
 import subprocess
 import threading
 from datetime import datetime, timedelta
@@ -90,23 +91,69 @@ class CECController:
     ) -> None:
         self._tool = tool or os.environ.get("PROJECTOR_CEC_TOOL", "cec-ctl")
         self._device = device or os.environ.get("PROJECTOR_CEC_DEVICE")
-        self._logical_address = logical_address or os.environ.get("PROJECTOR_CEC_LOGICAL_ADDR", "0")
+        self._logical_address = self._resolve_logical_address(logical_address)
+        self._power_on_args = self._load_custom_args("PROJECTOR_CEC_POWER_ON_ARGS")
+        self._power_off_args = self._load_custom_args("PROJECTOR_CEC_POWER_OFF_ARGS")
 
     def power_on(self) -> bool:
-        return self._run_cec_command(["--power", "on"])
+        args, include_target = self._build_command_args("power_on")
+        return self._run_cec_command(args, include_target)
 
     def power_off(self) -> bool:
-        return self._run_cec_command(["--standby"])
+        args, include_target = self._build_command_args("power_off")
+        return self._run_cec_command(args, include_target)
 
-    def _run_cec_command(self, args: list) -> bool:
+    def _load_custom_args(self, env_var: str) -> Optional[list]:
+        raw = os.environ.get(env_var)
+        if not raw:
+            return None
+        return shlex.split(raw)
+
+    def _resolve_logical_address(self, override: Optional[str]) -> Optional[str]:
+        if override is not None:
+            return override or None
+        env_value = os.environ.get("PROJECTOR_CEC_LOGICAL_ADDR")
+        if env_value is not None:
+            return env_value or None
+        return "0"
+
+    def _build_command_args(self, action: str) -> Tuple[list, bool]:
+        if action not in {"power_on", "power_off"}:
+            raise ValueError(f"Unsupported CEC action '{action}'")
+
+        custom_args = self._power_on_args if action == "power_on" else self._power_off_args
+        if custom_args is not None:
+            return custom_args, False
+
+        if not self._tool:
+            return [], False
+
+        tool_name = Path(self._tool).name.lower()
+        if "cec-ctl" in tool_name:
+            if action == "power_on":
+                return ["--wake"], True
+            return ["--standby"], True
+
+        logging.error(
+            "CEC tool '%s' is not recognised. Configure PROJECTOR_CEC_POWER_ON_ARGS / "
+            "PROJECTOR_CEC_POWER_OFF_ARGS with explicit arguments.",
+            self._tool,
+        )
+        return [], False
+
+    def _run_cec_command(self, args: list, include_target: bool) -> bool:
         if not self._tool:
             logging.error("CEC tool is not configured; skipping projector command.")
+            return False
+
+        if not args:
+            logging.error("No CEC arguments resolved for projector command.")
             return False
 
         command = [self._tool]
         if self._device:
             command.extend(["--device", self._device])
-        if self._logical_address:
+        if include_target and self._logical_address:
             command.extend(["--to", str(self._logical_address)])
         command.extend(args)
 
