@@ -131,7 +131,7 @@ class CECController:
         tool_name = Path(self._tool).name.lower()
         if "cec-ctl" in tool_name:
             if action == "power_on":
-                return ["--wake"], True
+                return ["--image-view-on"], True
             return ["--standby"], True
 
         logging.error(
